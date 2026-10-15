@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HyperBall - 3D Platformer & Level Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0f19;
+            color: #f3f4f6;
+            overflow: hidden;
+            user-select: none;
+        }
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+        /* Custom scrollbar for game menus */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.8);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(59, 130, 246, 0.5);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(59, 130, 246, 0.8);
+        }
+        canvas {
+            display: block;
+            outline: none;
+        }
+        .glow-cyan {
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.5);
+        }
+        .glow-purple {
+            box-shadow: 0 0 25px rgba(168, 85, 247, 0.6);
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="w-screen h-screen relative">
+
+    <div id="canvas-container" class="absolute inset-0 z-0"></div>
+
+    <div id="ui-container" class="absolute inset-0 z-10 pointer-events-none flex flex-col justify-between p-6">
+        
+        <!-- HEADER / TOP HUD -->
+        <header id="top-hud" class="w-full flex justify-between items-center pointer-events-auto hidden">
+            <div class="glass-panel px-4 py-2 rounded-xl flex items-center space-x-6 glow-cyan">
+                <div>
+                    <span class="text-xs text-cyan-400 font-orbitron">TIME</span>
+                    <div id="hud-time" class="text-xl font-bold font-orbitron">00:00.00</div>
+                </div>
+                <div class="border-l border-slate-700 pl-6">
+                    <span class="text-xs text-rose-400 font-orbitron">DEATHS</span>
+                    <div id="hud-deaths" class="text-xl font-bold font-orbitron text-rose-400">0</div>
+                </div>
+                <div class="border-l border-slate-700 pl-6">
+                    <span class="text-xs text-amber-400 font-orbitron">STYLE</span>
+                    <div id="hud-style" class="text-xl font-bold font-orbitron text-amber-400">0</div>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <button id="btn-pause" class="glass-panel px-5 py-2.5 rounded-xl font-orbitron font-bold text-sm text-cyan-300 hover:bg-cyan-500/20 transition transform active:scale-95 pointer-events-auto">
+                    PAUSE (ESC)
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN MENU SCREEN -->
+        <div id="screen-main-menu" class="absolute inset-0 pointer-events-auto flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md transition-opacity duration-500">
+            <div class="text-center mb-10">
+                <h1 class="text-6xl md:text-8xl font-black font-orbitron tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-indigo-500 to-purple-500 drop-shadow-[0_0_35px_rgba(6,182,212,0.6)]">
+                    HYPERBALL
+                </h1>
+                <p class="text-slate-400 text-sm md:text-base font-orbitron tracking-widest mt-2">NEXT-GEN 3D PLATFORMER & LEVEL BUILDER</p>
+            </div>
+
+            <div class="flex flex-col space-y-4 w-72 md:w-80">
+                <button onclick="switchScreen('play')" class="glass-panel py-4 rounded-xl font-orbitron font-bold text-lg text-cyan-300 hover:bg-cyan-500/20 hover:border-cyan-400 transition transform active:scale-95 glow-cyan text-center">
+                    PLAY GAME
+                </button>
+                <button onclick="switchScreen('editor')" class="glass-panel py-4 rounded-xl font-orbitron font-bold text-lg text-purple-300 hover:bg-purple-500/20 hover:border-purple-400 transition transform active:scale-95 glow-purple text-center">
+                    LEVEL CREATOR
+                </button>
+                <button onclick="switchScreen('customizer')" class="glass-panel py-4 rounded-xl font-orbitron font-bold text-lg text-emerald-300 hover:bg-emerald-500/20 hover:border-emerald-400 transition transform active:scale-95 text-center">
+                    BALL CUSTOMIZER
+                </button>
+                <button onclick="switchScreen('profiles')" class="glass-panel py-4 rounded-xl font-orbitron font-bold text-lg text-amber-300 hover:bg-amber-500/20 hover:border-amber-400 transition transform active:scale-95 text-center">
+                    PROFILE SEARCH
+                </button>
+                <button onclick="switchScreen('settings')" class="glass-panel py-4 rounded-xl font-orbitron font-bold text-lg text-slate-300 hover:bg-slate-700/50 transition transform active:scale-95 text-center">
+                    SETTINGS
+                </button>
+                <button onclick="openAuthModal()" class="glass-panel py-4 rounded-xl font-orbitron font-bold text-lg text-rose-300 hover:bg-rose-500/20 transition transform active:scale-95 text-center">
+                    ACCOUNT / LOGIN
+                </button>
+            </div>
+
+            <div id="menu-user-badge" class="absolute bottom-6 left-6 text-xs text-slate-400 font-orbitron">
+                Logged in as: <span id="current-username" class="text-cyan-400 font-bold">Guest</span>
+            </div>
+        </div>
+
+        <div id="screen-play" class="absolute inset-0 pointer-events-auto flex flex-col p-8 bg-slate-950/90 backdrop-blur-lg hidden opacity-0 transition-opacity duration-300">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-3xl font-black font-orbitron text-cyan-400">SELECT LEVEL</h2>
+                    <p class="text-slate-400 text-sm">Choose from official developer levels, community creations, or your own.</p>
+                </div>
+                <button onclick="switchScreen('main-menu')" class="glass-panel px-6 py-2.5 rounded-xl font-orbitron font-bold text-sm text-slate-300 hover:bg-slate-700">
+                    BACK TO MENU
+                </button>
+            </div>
+
+            <!-- Tabs -->
+            <div class="flex space-x-4 mb-6">
+                <button onclick="switchPlayTab('official')" id="tab-btn-official" class="px-6 py-2 rounded-xl font-orbitron font-bold text-sm bg-cyan-500 text-slate-950 shadow-lg">Official Levels</button>
+                <button onclick="switchPlayTab('community')" id="tab-btn-community" class="px-6 py-2 rounded-xl font-orbitron font-bold text-sm glass-panel text-slate-300 hover:bg-slate-800">Community</button>
+                <button onclick="switchPlayTab('my')" id="tab-btn-my" class="px-6 py-2 rounded-xl font-orbitron font-bold text-sm glass-panel text-slate-300 hover:bg-slate-800">My Levels</button>
+            </div>
+
+            <!-- Level Grid -->
+            <div id="level-list-container" class="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pr-2">
+                <!-- Dynamically populated levels -->
+            </div>
+        </div>
+
+        <div id="screen-customizer" class="absolute inset-0 pointer-events-auto flex flex-col p-8 bg-slate-950/90 backdrop-blur-lg hidden opacity-0 transition-opacity duration-300">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-3xl font-black font-orbitron text-emerald-400">BALL CUSTOMIZER</h2>
+                    <p class="text-slate-400 text-sm">Personalize your ball color, texture, and jump particles.</p>
+                </div>
+                <button onclick="switchScreen('main-menu')" class="glass-panel px-6 py-2.5 rounded-xl font-orbitron font-bold text-sm text-slate-300 hover:bg-slate-700">
+                    BACK TO MENU
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 flex-1 overflow-y-auto">
+                <div class="glass-panel p-6 rounded-2xl flex flex-col space-y-6">
+                    <h3 class="font-orbitron font-bold text-lg text-emerald-300">Appearance</h3>
+                    <div>
+                        <label class="text-xs text-slate-400 font-orbitron block mb-2">Primary Color</label>
+                        <input type="color" id="custom-color" value="#06b6d4" class="w-full h-12 rounded-xl bg-slate-900 border border-slate-700 cursor-pointer p-1">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 font-orbitron block mb-2">Texture Style</label>
+                        <select id="custom-texture" class="w-full glass-panel px-4 py-3 rounded-xl font-orbitron text-sm text-slate-200 outline-none">
+                            <option value="solid">Smooth Glossy</option>
+                            <option value="grid">Cyber Grid</option>
+                            <option value="metallic">Brushed Metal</option>
+                            <option value="neon">Neon Wireframe</option>
+                        </select>
+                    </div>
+                    <div id="pulse-wrapper" class="pt-4 border-t border-slate-800">
+                        <label class="text-xs text-purple-400 font-orbitron block mb-2">Pulse Aura (Beat All Official Levels)</label>
+                        <div id="pulse-status" class="text-sm font-semibold text-rose-400">Locked (Complete All Official Levels)</div>
+                        <button id="btn-toggle-pulse" onclick="togglePulseEffect()" disabled class="mt-3 w-full py-3 rounded-xl font-orbitron font-bold text-sm bg-slate-800 text-slate-500 cursor-not-allowed">Enable Pulse Aura</button>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl flex flex-col space-y-6">
+                    <h3 class="font-orbitron font-bold text-lg text-cyan-300">Jump Particles</h3>
+                    <div>
+                        <label class="text-xs text-slate-400 font-orbitron block mb-2">Particle Type</label>
+                        <select id="custom-particle-type" class="w-full glass-panel px-4 py-3 rounded-xl font-orbitron text-sm text-slate-200 outline-none">
+                            <option value="spark">Energy Sparks</option>
+                            <option value="confetti">Digital Confetti</option>
+                            <option value="smoke">Plasma Smoke</option>
+                            <option value="rings">Shockwave Rings</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 font-orbitron block mb-2">Particle Color</label>
+                        <input type="color" id="custom-particle-color" value="#3b82f6" class="w-full h-12 rounded-xl bg-slate-900 border border-slate-700 cursor-pointer p-1">
+                    </div>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl flex flex-col items-center justify-center relative">
+                    <div class="absolute top-4 left-4 text-xs font-orbitron text-slate-400">Preview</div>
+                    <div id="preview-container" class="w-64 h-64"></div>
+                    <button onclick="saveCustomization()" class="mt-6 w-full py-4 rounded-xl font-orbitron font-bold text-sm bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/30">
+                        SAVE CONFIGURATION
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="screen-profiles" class="absolute inset-0 pointer-events-auto flex flex-col p-8 bg-slate-950/90 backdrop-blur-lg hidden opacity-0 transition-opacity duration-300">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-3xl font-black font-orbitron text-amber-400">PROFILE DIRECTORY</h2>
+                    <p class="text-slate-400 text-sm">Search player profiles to view completed levels and creations.</p>
+                </div>
+                <button onclick="switchScreen('main-menu')" class="glass-panel px-6 py-2.5 rounded-xl font-orbitron font-bold text-sm text-slate-300 hover:bg-slate-700">
+                    BACK TO MENU
+                </button>
+            </div>
+
+            <div class="flex space-x-4 mb-6">
+                <input type="text" id="profile-search-input" placeholder="Enter username..." class="flex-1 glass-panel px-5 py-3 rounded-xl font-orbitron text-sm text-slate-200 outline-none focus:border-amber-400">
+                <button onclick="searchProfiles()" class="px-8 py-3 rounded-xl font-orbitron font-bold text-sm bg-amber-500 text-slate-950 hover:bg-amber-400 transition">SEARCH</button>
+            </div>
+
+            <div id="profile-results" class="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-6 pr-2">
+                <!-- Profile result cards -->
+            </div>
+        </div>
+
+        <div id="screen-settings" class="absolute inset-0 pointer-events-auto flex flex-col p-8 bg-slate-950/90 backdrop-blur-lg hidden opacity-0 transition-opacity duration-300">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-3xl font-black font-orbitron text-slate-200">SETTINGS</h2>
+                    <p class="text-slate-400 text-sm">Configure graphics, audio, and player controls.</p>
+                </div>
+                <button onclick="switchScreen('main-menu')" class="glass-panel px-6 py-2.5 rounded-xl font-orbitron font-bold text-sm text-slate-300 hover:bg-slate-700">
+                    BACK TO MENU
+                </button>
+            </div>
+
+            <div class="max-w-xl mx-w-xl w-full mx-auto glass-panel p-8 rounded-2xl space-y-6">
+                <div>
+                    <label class="text-xs text-slate-400 font-orbitron block mb-2">Graphics Quality</label>
+                    <select id="settings-graphics" class="w-full glass-panel px-4 py-3 rounded-xl font-orbitron text-sm text-slate-200 outline-none">
+                        <option value="low">Low (Optimized Performance)</option>
+                        <option value="medium" selected>Medium (Balanced)</option>
+                        <option value="high">High (Maximum Visuals & Shadows)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 font-orbitron block mb-2">Controls Scheme</label>
+                    <div class="glass-panel p-4 rounded-xl text-sm font-orbitron text-slate-300 space-y-2">
+                        <div class="flex justify-between"><span>Move:</span> <span class="text-cyan-400 font-bold">W A S D / Arrow Keys</span></div>
+                        <div class="flex justify-between"><span>Jump:</span> <span class="text-cyan-400 font-bold">Spacebar</span></div>
+                        <div class="flex justify-between"><span>Camera Orbit:</span> <span class="text-cyan-400 font-bold">Left Click + Drag Mouse</span></div>
+                        <div class="flex justify-between"><span>Pause:</span> <span class="text-cyan-400 font-bold">ESC Key</span></div>
+                    </div>
+                </div>
+                <button onclick="saveSettings()" class="w-full py-4 rounded-xl font-orbitron font-bold text-sm bg-cyan-500 text-slate-950 hover:bg-cyan-400 transition shadow-lg shadow-cyan-500/30">
+                    APPLY & SAVE SETTINGS
+                </button>
+            </div>
+        </div>
+
+        <div id="screen-editor" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 hidden opacity-0 transition-opacity duration-300">
+            <!-- Editor Top Bar -->
+            <div class="pointer-events-auto flex justify-between items-center glass-panel px-6 py-3 rounded-2xl shadow-xl">
+                <div class="flex items-center space-x-4">
+                    <h2 class="font-orbitron font-bold text-xl text-purple-400">LEVEL EDITOR</h2>
+                    <input type="text" id="editor-level-name" placeholder="Level Title" value="My Custom Level" class="glass-panel px-3 py-1.5 rounded-lg font-orbitron text-sm text-slate-200 w-48 outline-none">
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button onclick="editorAction('playtest')" class="px-5 py-2 rounded-xl font-orbitron font-bold text-sm bg-cyan-500 text-slate-950 hover:bg-cyan-400 transition shadow-lg shadow-cyan-500/20">PLAYTEST</button>
+                    <button onclick="editorAction('save')" class="px-5 py-2 rounded-xl font-orbitron font-bold text-sm bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/20">SAVE LEVEL</button>
+                    <button onclick="switchScreen('main-menu')" class="glass-panel px-5 py-2 rounded-xl font-orbitron font-bold text-sm text-slate-300 hover:bg-slate-700">EXIT</button>
+                </div>
+            </div>
+
+            <!-- Editor Toolbar (Left) -->
+            <div class="pointer-events-auto absolute left-6 top-24 glass-panel p-3 rounded-2xl flex flex-col space-y-3 shadow-xl">
+                <span class="text-[10px] font-orbitron text-slate-400 text-center">TOOLS</span>
+                <button onclick="setEditorTool('select')" id="tool-select" class="p-3 rounded-xl bg-purple-500/30 border border-purple-500 text-purple-300 font-orbitron text-xs hover:bg-purple-500/20 transition">Select</button>
+                <button onclick="setEditorTool('move')" id="tool-move" class="p-3 rounded-xl glass-panel text-slate-300 font-orbitron text-xs hover:bg-slate-800 transition">Move</button>
+                <button onclick="setEditorTool('resize')" id="tool-resize" class="p-3 rounded-xl glass-panel text-slate-300 font-orbitron text-xs hover:bg-slate-800 transition">Resize</button>
+                <button onclick="setEditorTool('rotate')" id="tool-rotate" class="p-3 rounded-xl glass-panel text-slate-300 font-orbitron text-xs hover:bg-slate-800 transition">Rotate</button>
+                <button onclick="deleteSelectedObject()" class="p-3 rounded-xl glass-panel text-rose-400 font-orbitron text-xs hover:bg-rose-500/20 transition">Delete</button>
+                <hr class="border-slate-700 my-1">
+                <span class="text-[10px] font-orbitron text-slate-400 text-center">GRID</span>
+                <button onclick="toggleEditorGrid()" id="btn-toggle-grid" class="p-3 rounded-xl bg-cyan-500/20 border border-cyan-500 text-cyan-300 font-orbitron text-xs">Grid: ON</button>
+            </div>
+
+            <!-- Editor Spawn Menu (Bottom) -->
+            <div class="pointer-events-auto self-center glass-panel px-6 py-3 rounded-2xl flex items-center space-x-3 shadow-xl overflow-x-auto max-w-full">
+                <span class="text-xs font-orbitron text-slate-400 mr-2">SPAWN:</span>
+                <button onclick="spawnObject('block')" class="px-4 py-2 rounded-xl glass-panel text-xs font-orbitron text-slate-200 hover:bg-purple-500/20 hover:border-purple-400">Block</button>
+                <button onclick="spawnObject('wedge')" class="px-4 py-2 rounded-xl glass-panel text-xs font-orbitron text-slate-200 hover:bg-purple-500/20 hover:border-purple-400">Wedge</button>
+                <button onclick="spawnObject('sphere')" class="px-4 py-2 rounded-xl glass-panel text-xs font-orbitron text-slate-200 hover:bg-purple-500/20 hover:border-purple-400">Sphere</button>
+                <button onclick="spawnObject('moving')" class="px-4 py-2 rounded-xl glass-panel text-xs font-orbitron text-slate-200 hover:bg-purple-500/20 hover:border-purple-400">Moving Block</button>
+                <button onclick="spawnObject('spinner')" class="px-4 py-2 rounded-xl glass-panel text-xs font-orbitron text-slate-200 hover:bg-purple-500/20 hover:border-purple-400">Spinner</button>
+                <button onclick="spawnObject('button')" class="px-4 py-2 rounded-xl glass-panel text-xs font-orbitron text-slate-200 hover:bg-purple-500/20 hover:border-purple-400">Button</button>
+                <button onclick="spawnObject('checkpoint')" class="px-4 py-2 rounded-xl glass-panel text-xs font-orbitron text-amber-300 hover:bg-amber-500/20 hover:border-amber-400">Checkpoint</button>
+                <button onclick="spawnObject('winpad')" class="px-4 py-2 rounded-xl glass-panel text-xs font-orbitron text-emerald-300 hover:bg-emerald-500/20 hover:border-emerald-400">Winpad</button>
+            </div>
+
+            <!-- Properties Tab (Right) -->
+            <div id="properties-panel" class="pointer-events-auto absolute right-6 top-24 w-80 glass-panel p-6 rounded-2xl shadow-xl hidden flex flex-col space-y-4 max-h-[calc(100vh-140px)] overflow-y-auto">
+                <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                    <h3 class="font-orbitron font-bold text-sm text-purple-300">OBJECT PROPERTIES</h3>
+                    <button onclick="closeProperties()" class="text-slate-400 hover:text-slate-200 text-sm">✕</button>
+                </div>
+                
+                <div class="space-y-4 text-xs font-orbitron">
+                    <div>
+                        <label class="text-slate-400 block mb-1">Color</label>
+                        <input type="color" id="prop-color" onchange="updateObjectProperty('color', this.value)" class="w-full h-10 rounded-lg bg-slate-900 border border-slate-700 p-1 cursor-pointer">
+                    </div>
+                    <div>
+                        <label class="text-slate-400 block mb-1">Light Color</label>
+                        <input type="color" id="prop-light-color" onchange="updateObjectProperty('lightColor', this.value)" class="w-full h-10 rounded-lg bg-slate-900 border border-slate-700 p-1 cursor-pointer">
+                    </div>
+                    <div>
+                        <label class="text-slate-400 block mb-1">Spin Speed (Rotation)</label>
+                        <input type="range" id="prop-spin" min="0" max="5" step="0.1" value="0" oninput="updateObjectProperty('spinSpeed', parseFloat(this.value))" class="w-full accent-purple-500">
+                    </div>
+                    <div>
+                        <label class="text-slate-400 block mb-1">Move Speed (Oscillation)</label>
+                        <input type="range" id="prop-move" min="0" max="5" step="0.1" value="0" oninput="updateObjectProperty('moveSpeed', parseFloat(this.value))" class="w-full accent-purple-500">
+                    </div>
+                    <div>
+                        <label class="text-slate-400 block mb-1">Link Button ID</label>
+                        <input type="text" id="prop-link" onchange="updateObjectProperty('linkId', this.value)" placeholder="Target ID" class="w-full glass-panel px-3 py-2 rounded-lg text-slate-200 outline-none">
+                    </div>
+                    <div>
+                        <label class="text-slate-400 block mb-1">Hologram Text</label>
+                        <input type="text" id="prop-text" onchange="updateObjectProperty('text', this.value)" placeholder="Enter text..." class="w-full glass-panel px-3 py-2 rounded-lg text-slate-200 outline-none">
+                    </div>
+                    <div class="space-y-2 pt-2 border-t border-slate-700">
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="prop-style" onchange="updateObjectProperty('hasStylePoints', this.checked)" class="rounded accent-purple-500">
+                            <span class="text-slate-300">Style Points Center Crosshair</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="prop-checkpoint" onchange="updateObjectProperty('isCheckpoint', this.checked)" class="rounded accent-purple-500">
+                            <span class="text-amber-300">Is Checkpoint</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="prop-winpad" onchange="updateObjectProperty('isWinpad', this.checked)" class="rounded accent-purple-500">
+                            <span class="text-emerald-300">Is Winpad (End Orb)</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="modal-pause" class="absolute inset-0 pointer-events-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center hidden z-50">
+            <div class="glass-panel p-8 rounded-2xl w-80 flex flex-col space-y-4 shadow-2xl glow-cyan text-center">
+                <h3 class="text-2xl font-black font-orbitron text-cyan-400 mb-2">PAUSED</h3>
+                <button onclick="resumeGame()" class="w-full py-3.5 rounded-xl font-orbitron font-bold text-sm bg-cyan-500 text-slate-950 hover:bg-cyan-400 transition">CONTINUE</button>
+                <button onclick="openSettingsFromPause()" class="w-full py-3.5 rounded-xl font-orbitron font-bold text-sm glass-panel text-slate-200 hover:bg-slate-800 transition">SETTINGS</button>
+                <button onclick="quitToLevelSelect()" class="w-full py-3.5 rounded-xl font-orbitron font-bold text-sm glass-panel text-rose-400 hover:bg-rose-500/20 transition">QUIT LEVEL</button>
+                <button onclick="switchScreen('main-menu'); closePauseMenu()" class="w-full py-3.5 rounded-xl font-orbitron font-bold text-sm glass-panel text-slate-400 hover:bg-slate-800 transition">QUIT TO MAIN MENU</button>
+            </div>
+        </div>
+
+        <div id="custom-modal" class="absolute inset-0 pointer-events-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center hidden z-50">
+            <div class="glass-panel p-8 rounded-2xl w-96 flex flex-col space-y-4 shadow-2xl glow-purple text-center">
+                <h3 id="modal-title" class="text-xl font-black font-orbitron text-purple-400">NOTICE</h3>
+                <p id="modal-message" class="text-sm text-slate-300 font-orbitron">Message goes here...</p>
+                <div id="modal-input-container" class="hidden">
+                    <input type="text" id="modal-input" class="w-full glass-panel px-4 py-3 rounded-xl font-orbitron text-sm text-slate-200 outline-none mt-2">
+                </div>
+                <div class="flex space-x-3 mt-4">
+                    <button id="modal-btn-cancel" onclick="closeCustomModal()" class="flex-1 py-3 rounded-xl font-orbitron font-bold text-sm glass-panel text-slate-400 hover:bg-slate-800">CANCEL</button>
+                    <button id="modal-btn-confirm" class="flex-1 py-3 rounded-xl font-orbitron font-bold text-sm bg-purple-500 text-slate-950 hover:bg-purple-400">OK</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, getDocs, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Configuration provided
+        const firebaseConfig = {
+            apiKey: "AIzaSyCH-4Ecw4_zeqpQhPZ2RIpUDTPHZkQrGpY",
+            authDomain: "hyperball-d9d62.firebaseapp.com",
+            projectId: "hyperball-d9d62",
+            storageBucket: "hyperball-d9d62.firebasestorage.app",
+            messagingSenderId: "291239452013",
+            appId: "1:291239452013:web:4a5b733dff35a450ce4e64",
+            measurementId: "G-R03FY2XM2B"
+        };
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'hyperball-default-app';
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let currentUser = null;
+        let isAdmin = false;
+        const ADMIN_USERNAME = "LtpMer";
+
+        // Global State & Game Variables
+        window.currentScreen = 'main-menu';
+        window.activePlayTab = 'official';
+        let scene, camera, renderer, clock;
+        let ball, ballMesh, ballPhysics = { x: 0, y: 2, z: 0, vx: 0, vy: 0, vz: 0, radius: 0.8, grounded: false };
+        let cameraAngle = 0, cameraPitch = 0.5, cameraDist = 8;
+        let currentLevel = null;
+        let levelObjects = [];
+        let editorObjects = [];
+        let selectedObject = null;
+        let editorTool = 'select';
+        let gridHelper, gridEnabled = true;
+        let gameTime = 0, gameDeaths = 0, gameStyle = 0, gameTimerRunning = false;
+        let checkpoints = [], currentCheckpoint = { x: 0, y: 2, z: 0 };
+        let customSettings = { graphics: 'medium', controls: 'wasd' };
+        let customBall = { color: '#06b6d4', texture: 'solid', pulse: false, particleType: 'spark', particleColor: '#3b82f6' };
+        let officialLevelsBeaten = 0;
+        let activeKeys = {};
+
+        // Authentication Initialization
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                currentUser = auth.currentUser;
+                let username = "Anonymous_" + Math.floor(Math.random() * 9000 + 1000);
+                if (currentUser) {
+                    const userDocRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'profile', 'data');
+                    const userSnap = await getDoc(userDocRef);
+                    if (userSnap.exists()) {
+                        username = userSnap.data().username || username;
+                    } else {
+                        await setDoc(userDocRef, { username, passedLevels: [], builtLevels: [] });
+                    }
+                }
+                isAdmin = (username === ADMIN_USERNAME);
+                document.getElementById('current-username').innerText = username + (isAdmin ? " [ADMIN]" : "");
+                loadLevelsFromFirebase();
+            } catch (err) {
+                console.error("Auth error:", err);
+            }
+        }
+
+        window.openAuthModal = function() {
+            showCustomModal("Account & Login", "Enter your username to sign in:", true, async (val) => {
+                if (!val) return;
+                let username = val.trim();
+                if (currentUser) {
+                    const userDocRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'profile', 'data');
+                    await setDoc(userDocRef, { username }, { merge: true });
+                    isAdmin = (username === ADMIN_USERNAME);
+                    document.getElementById('current-username').innerText = username + (isAdmin ? " [ADMIN]" : "");
+                    showCustomModal("Success", "Username updated to " + username, false);
+                }
+            });
+        }
+
+        // Three.js Scene Setup
+        function initThree() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0b0f19);
+            scene.fog = new THREE.FogExp2(0x0b0f19, 0.015);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            clock = new THREE.Clock();
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0x06b6d4, 1.2);
+            dirLight.position.set(20, 40, 20);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            scene.add(dirLight);
+
+            // Grid
+            gridHelper = new THREE.GridHelper(100, 100, 0x06b6d4, 0x1e293b);
+            gridHelper.position.y = -0.01;
+            scene.add(gridHelper);
+
+            // Create Preview Ball in Customizer
+            initCustomizerPreview();
+
+            window.addEventListener('resize', onWindowResize);
+            setupInputListeners();
+            animate();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Screen Switching
+        window.switchScreen = function(screenName) {
+            window.currentScreen = screenName;
+            const screens = ['screen-main-menu', 'screen-play', 'screen-customizer', 'screen-profiles', 'screen-settings', 'screen-editor'];
+            screens.forEach(s => {
+                const el = document.getElementById(s);
+                if (el) {
+                    el.classList.add('hidden');
+                    el.classList.add('opacity-0');
+                }
+            });
+
+            document.getElementById('top-hud').classList.add('hidden');
+
+            if (screenName === 'main-menu') {
+                const el = document.getElementById('screen-main-menu');
+                el.classList.remove('hidden');
+                setTimeout(() => el.classList.remove('opacity-0'), 10);
+            } else if (screenName === 'play') {
+                const el = document.getElementById('screen-play');
+                el.classList.remove('hidden');
+                setTimeout(() => el.classList.remove('opacity-0'), 10);
+                loadPlayLevels();
+            } else if (screenName === 'customizer') {
+                const el = document.getElementById('screen-customizer');
+                el.classList.remove('hidden');
+                setTimeout(() => el.classList.remove('opacity-0'), 10);
+            } else if (screenName === 'profiles') {
+                const el = document.getElementById('screen-profiles');
+                el.classList.remove('hidden');
+                setTimeout(() => el.classList.remove('opacity-0'), 10);
+            } else if (screenName === 'settings') {
+                const el = document.getElementById('screen-settings');
+                el.classList.remove('hidden');
+                setTimeout(() => el.classList.remove('opacity-0'), 10);
+            } else if (screenName === 'editor') {
+                const el = document.getElementById('screen-editor');
+                el.classList.remove('hidden');
+                setTimeout(() => el.classList.remove('opacity-0'), 10);
+                initEditorScene();
+            } else if (screenName === 'gameplay') {
+                document.getElementById('top-hud').classList.remove('hidden');
+                startGameplaySession();
+            }
+        }
+
+        // Editor & Level Building
+        let editorMeshes = [];
+        function initEditorScene() {
+            clearSceneObjects();
+            editorObjects = [];
+            editorMeshes = [];
+            // Spawn default starter platform
+            spawnObjectData({ type: 'block', x: 0, y: -0.5, z: 0, sx: 10, sy: 1, sz: 10, color: '#1e293b' });
+            spawnObjectData({ type: 'winpad', x: 0, y: 1, z: -15, sx: 2, sy: 2, sz: 2, isWinpad: true });
+        }
+
+        window.spawnObject = function(type) {
+            let data = {
+                id: 'obj_' + Math.random().toString(36.substring(2, 9)),
+                type: type,
+                x: 0, y: 2, z: 0,
+                sx: 2, sy: 2, sz: 2,
+                rx: 0, ry: 0, rz: 0,
+                color: '#3b82f6',
+                lightColor: '#06b6d4',
+                spinSpeed: 0,
+                moveSpeed: 0,
+                linkId: '',
+                text: '',
+                hasStylePoints: type === 'block',
+                isCheckpoint: type === 'checkpoint',
+                isWinpad: type === 'winpad'
+            };
+            if (type === 'checkpoint') data.color = '#f59e0b';
+            if (type === 'winpad') data.color = '#10b981';
+            editorObjects.push(data);
+            rebuildEditorMeshes();
+        }
+
+        function spawnObjectData(data) {
+            editorObjects.push(data);
+            rebuildEditorMeshes();
+        }
+
+        function rebuildEditorMeshes() {
+            editorMeshes.forEach(m => scene.remove(m));
+            editorMeshes = [];
+            editorObjects.forEach((objData, index) => {
+                let mesh = createMeshFromData(objData);
+                mesh.userData = { index: index, data: objData };
+                scene.add(mesh);
+                editorMeshes.push(mesh);
+            });
+        }
+
+        function createMeshFromData(data) {
+            let geom, mat;
+            let color = new THREE.Color(data.color || '#3b82f6');
+            if (data.type === 'wedge') {
+                geom = new THREE.ConeGeometry(1.4, 2, 4);
+            } else if (data.type === 'sphere' || data.isWinpad || data.isCheckpoint) {
+                geom = new THREE.SphereGeometry(data.sx / 2, 32, 32);
+            } else {
+                geom = new THREE.BoxGeometry(data.sx, data.sy, data.sz);
+            }
+
+            if (data.isWinpad) {
+                mat = new THREE.MeshStandardemissive ? new THREE.MeshStandardMaterial({ color: 0x10b981, emissive: 0x10b981, emissiveIntensity: 0.8 }) : new THREE.MeshBasicMaterial({ color: 0x10b981 });
+            } else if (data.isCheckpoint) {
+                mat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 0.5 });
+            } else {
+                mat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.3, metalness: 0.2 });
+            }
+
+            let mesh = new THREE.Mesh(geom, mat);
+            mesh.position.set(data.x, data.y, data.z);
+            mesh.rotation.set(data.rx || 0, data.ry || 0, data.rz || 0);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            return mesh;
+        }
+
+        window.setEditorTool = function(tool) {
+            editorTool = tool;
+            ['select', 'move', 'resize', 'rotate'].forEach(t => {
+                const btn = document.getElementById('tool-' + t);
+                if (btn) {
+                    if (t === tool) {
+                        btn.className = "p-3 rounded-xl bg-purple-500/30 border border-purple-500 text-purple-300 font-orbitron text-xs";
+                    } else {
+                        btn.className = "p-3 rounded-xl glass-panel text-slate-300 font-orbitron text-xs";
+                    }
+                }
+            });
+        }
+
+        window.toggleEditorGrid = function() {
+            gridEnabled = !gridEnabled;
+            gridHelper.visible = gridEnabled;
+            const btn = document.getElementById('btn-toggle-grid');
+            btn.innerText = "Grid: " + (gridEnabled ? "ON" : "OFF");
+            btn.className = gridEnabled ? "p-3 rounded-xl bg-cyan-500/20 border border-cyan-500 text-cyan-300 font-orbitron text-xs" : "p-3 rounded-xl glass-panel text-slate-400 font-orbitron text-xs";
+        }
+
+        // Raycasting selection in editor
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        window.addEventListener('pointerdown', (e) => {
+            if (window.currentScreen !== 'editor') return;
+            if (e.target.tagName !== 'CANVAS') return;
+
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(editorMeshes);
+
+            if (intersects.length > 0) {
+                const hit = intersects[0].object;
+                selectedObject = hit.userData.data;
+                openPropertiesPanel(selectedObject);
+            }
+        });
+
+        function openPropertiesPanel(obj) {
+            const panel = document.getElementById('properties-panel');
+            panel.classList.remove('hidden');
+            document.getElementById('prop-color').value = obj.color || '#3b82f6';
+            document.getElementById('prop-light-color').value = obj.lightColor || '#06b6d4';
+            document.getElementById('prop-spin').value = obj.spinSpeed || 0;
+            document.getElementById('prop-move').value = obj.moveSpeed || 0;
+            document.getElementById('prop-link').value = obj.linkId || '';
+            document.getElementById('prop-text').value = obj.text || '';
+            document.getElementById('prop-style').checked = !!obj.hasStylePoints;
+            document.getElementById('prop-checkpoint').checked = !!obj.isCheckpoint;
+            document.getElementById('prop-winpad').checked = !!obj.isWinpad;
+        }
+
+        window.closeProperties = function() {
+            document.getElementById('properties-panel').classList.add('hidden');
+            selectedObject = null;
+        }
+
+        window.updateObjectProperty = function(prop, val) {
+            if (!selectedObject) return;
+            selectedObject[prop] = val;
+            rebuildEditorMeshes();
+        }
+
+        window.deleteSelectedObject = function() {
+            if (!selectedObject) return;
+            editorObjects = editorObjects.filter(o => o !== selectedObject);
+            selectedObject = null;
+            closeProperties();
+            rebuildEditorMeshes();
+        }
+
+        window.editorAction = function(action) {
+            if (action === 'playtest') {
+                currentLevel = {
+                    title: document.getElementById('editor-level-name').value || 'Playtest Level',
+                    objects: editorObjects,
+                    author: currentUser ? currentUser.uid : 'guest'
+                };
+                switchScreen('gameplay');
+            } else if (action === 'save') {
+                saveLevelToFirebase();
+            }
+        }
+
+        async function saveLevelToFirebase() {
+            if (!currentUser) {
+                showCustomModal("Error", "You must be signed in to save levels.", false);
+                return;
+            }
+            const title = document.getElementById('editor-level-name').value || 'Untitled Level';
+            const levelId = 'lvl_' + Math.random().toString(36).substring(2, 9);
+            const levelData = {
+                id: levelId,
+                title: title,
+                author: currentUser.uid,
+                authorName: document.getElementById('current-username').innerText.replace(" [ADMIN]", ""),
+                objects: editorObjects,
+                official: false,
+                difficulty: 'Medium',
+                createdAt: Date.now()
+            };
+            try {
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'levels_' + levelId), levelData);
+                showCustomModal("Success", "Level saved successfully to Community levels!", false);
+            } catch (err) {
+                console.error("Save error:", err);
+                showCustomModal("Error", "Failed to save level.", false);
+            }
+        }
+
+        // Gameplay Engine
+        let gameplayMeshes = [];
+        let activeButtonsState = {};
+        let activeMovingBlocks = [];
+
+        function startGameplaySession() {
+            clearSceneObjects();
+            gameplayMeshes = [];
+            gameTime = 0;
+            gameDeaths = 0;
+            gameStyle = 0;
+            gameTimerRunning = true;
+
+            // Load default official level if none selected
+            if (!currentLevel) {
+                currentLevel = getOfficialStarterLevel();
+            }
+
+            // Setup Ball
+            createPlayBall();
+
+            // Setup level objects
+            currentLevel.objects.forEach(objData => {
+                let mesh = createMeshFromData(objData);
+                mesh.userData = { data: objData, originalY: objData.y };
+                scene.add(mesh);
+                gameplayMeshes.push(mesh);
+                if (objData.isCheckpoint) {
+                    checkpoints.push({ x: objData.x, y: objData.y + 1, z: objData.z });
+                }
+                if (objData.isWinpad) {
+                    // Make pulsing winpad
+                }
+            });
+
+            currentCheckpoint = { x: 0, y: 2, z: 0 };
+            ballPhysics.x = currentCheckpoint.x;
+            ballPhysics.y = currentCheckpoint.y;
+            ballPhysics.z = currentCheckpoint.z;
+            ballPhysics.vx = 0; ballPhysics.vy = 0; ballPhysics.vz = 0;
+
+            updateHUD();
+        }
+
+        function createPlayBall() {
+            const geom = new THREE.SphereGeometry(ballPhysics.radius, 32, 32);
+            let colorHex = customBall.color || '#06b6d4';
+            let mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.2, metalness: 0.5 });
+            if (customBall.pulse) {
+                mat.emissive = new THREE.Color(colorHex);
+                mat.emissiveIntensity = 0.6;
+            }
+            ballMesh = new THREE.Mesh(geom, mat);
+            ballMesh.castShadow = true;
+            scene.add(ballMesh);
+        }
+
+        function getOfficialStarterLevel() {
+            return {
+                title: "Cyber Horizon (Official 1)",
+                objects: [
+                    { type: 'block', x: 0, y: -0.5, z: 0, sx: 12, sy: 1, sz: 12, color: '#1e293b' },
+                    { type: 'block', x: 0, y: 0.5, z: -15, sx: 6, sy: 1, sz: 8, color: '#0ea5e9', hasStylePoints: true },
+                    { type: 'checkpoint', x: 0, y: 1.5, z: -15, sx: 1.5, sy: 1.5, sz: 1.5, isCheckpoint: true },
+                    { type: 'block', x: 0, y: 1.5, z: -30, sx: 5, sy: 1, sz: 5, color: '#6366f1' },
+                    { type: 'spinner', x: 0, y: 2.5, z: -30, sx: 6, sy: 0.5, sz: 1, spinSpeed: 2, color: '#a855f7' },
+                    { type: 'winpad', x: 0, y: 2.5, z: -45, sx: 2.5, sy: 2.5, sz: 2.5, isWinpad: true }
+                ]
+            };
+        }
+
+        // Input & Controls Setup
+        function setupInputListeners() {
+            window.addEventListener('keydown', (e) => {
+                activeKeys[e.code] = true;
+                if (e.code === 'Escape') {
+                    if (window.currentScreen === 'gameplay') {
+                        togglePauseMenu();
+                    }
+                }
+            });
+            window.addEventListener('keyup', (e) => {
+                activeKeys[e.code] = false;
+            });
+
+            let isMouseDown = false;
+            let mouseX = 0, mouseY = 0;
+
+            window.addEventListener('mousedown', (e) => {
+                if (e.button === 0) {
+                    isMouseDown = true;
+                    mouseX = e.clientX;
+                    mouseY = e.clientY;
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                isMouseDown = false;
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (isMouseDown && (window.currentScreen === 'gameplay' || window.currentScreen === 'editor')) {
+                    let deltaX = e.clientX - mouseX;
+                    let deltaY = e.clientY - mouseY;
+                    cameraAngle -= deltaX * 0.005;
+                    cameraPitch = Math.max(0.1, Math.min(1.4, cameraPitch - deltaY * 0.005));
+                    mouseX = e.clientX;
+                    mouseY = e.clientY;
+                }
+            });
+        }
+
+        // Main Animation & Physics Loop
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = clock.getDelta();
+
+            if (window.currentScreen === 'gameplay' && gameTimerRunning) {
+                gameTime += dt;
+                updateHUD();
+                updateGameplayPhysics(dt);
+            }
+
+            // Rotate Editor or Gameplay Spinners
+            scene.traverse(child => {
+                if (child.userData && child.userData.data) {
+                    let data = child.userData.data;
+                    if (data.spinSpeed) {
+                        child.rotation.y += data.spinSpeed * dt;
+                    }
+                    if (data.moveSpeed && child.userData.originalY !== undefined) {
+                        child.position.y = child.userData.originalY + Math.sin(Date.now() * 0.003 * data.moveSpeed) * 2;
+                    }
+                    if (data.isWinpad) {
+                        child.scale.setScalar(2 + Math.sin(Date.now() * 0.005) * 0.2);
+                    }
+                }
+            });
+
+            // Customizer Preview Ball rotation
+            if (window.currentScreen === 'customizer' && window.previewBallMesh) {
+                window.previewBallMesh.rotation.y += dt;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function updateGameplayPhysics(dt) {
+            // Ball movement controls
+            let moveSpeedMultiplier = 15;
+            let forward = 0, right = 0;
+            if (activeKeys['KeyW'] || activeKeys['ArrowUp']) forward += 1;
+            if (activeKeys['KeyS'] || activeKeys['ArrowDown']) forward -= 1;
+            if (activeKeys['KeyD'] || activeKeys['ArrowRight']) right += 1;
+            if (activeKeys['KeyA'] || activeKeys['ArrowLeft']) right -= 1;
+
+            let camForwardX = Math.sin(cameraAngle);
+            let camForwardZ = Math.cos(cameraAngle);
+            let camRightX = Math.sin(cameraAngle - Math.PI / 2);
+            let camRightZ = Math.cos(cameraAngle - Math.PI / 2);
+
+            ballPhysics.vx += (camForwardX * forward + camRightX * right) * moveSpeedMultiplier * dt;
+            ballPhysics.vz += (camForwardZ * forward + camRightZ * right) * moveSpeedMultiplier * dt;
+
+            // Friction / Damping
+            ballPhysics.vx *= 0.92;
+            ballPhysics.vz *= 0.92;
+
+            // Gravity
+            ballPhysics.vy -= 25 * dt;
+
+            ballPhysics.x += ballPhysics.vx * dt;
+            ballPhysics.y += ballPhysics.vy * dt;
+            ballPhysics.z += ballPhysics.vz * dt;
+
+            // Jump
+            if (activeKeys['Space'] && ballPhysics.grounded) {
+                ballPhysics.vy = 10;
+                ballPhysics.grounded = false;
+                spawnJumpParticles();
+            }
+
+            // Simple collision detection with gameplay meshes
+            ballPhysics.grounded = false;
+            gameplayMeshes.forEach(mesh => {
+                let data = mesh.userData.data;
+                let boxMinX = mesh.position.x - (data.sx || 2) / 2;
+                let boxMaxX = mesh.position.x + (data.sx || 2) / 2;
+                let boxMinY = mesh.position.y - (data.sy || 1) / 2;
+                let boxMaxY = mesh.position.y + (data.sy || 1) / 2;
+                let boxMinZ = mesh.position.z - (data.sz || 2) / 2;
+                let boxMaxZ = mesh.position.z + (data.sz || 2) / 2;
+
+                if (ballPhysics.x >= boxMinX && ballPhysics.x <= boxMaxX &&
+                    ballPhysics.y - ballPhysics.radius <= boxMaxY && ballPhysics.y + ballPhysics.radius >= boxMinY &&
+                    ballPhysics.z >= boxMinZ && ballPhysics.z <= boxMaxZ) {
+                    
+                    if (data.isWinpad) {
+                        triggerWin();
+                        return;
+                    }
+                    if (data.isCheckpoint) {
+                        currentCheckpoint = { x: mesh.position.x, y: mesh.position.y + 1.5, z: mesh.position.z };
+                        return;
+                    }
+
+                    // Check style points center crosshair
+                    if (data.hasStylePoints) {
+                        let distX = Math.abs(ballPhysics.x - mesh.position.x);
+                        let distZ = Math.abs(ballPhysics.z - mesh.position.z);
+                        if (distX < 0.5 && distZ < 0.5) {
+                            gameStyle += 100;
+                        } else {
+                            gameStyle += 25;
+                        }
+                    }
+
+                    // Collision resolution
+                    if (ballPhysics.vy < 0 && ballPhysics.y > boxMaxY - 0.8) {
+                        ballPhysics.y = boxMaxY + ballPhysics.radius;
+                        ballPhysics.vy = 0;
+                        ballPhysics.grounded = true;
+                    }
+                }
+            });
+
+            // Fall off death boundary
+            if (ballPhysics.y < -30) {
+                respawnBall();
+            }
+
+            // Update Ball Mesh position
+            if (ballMesh) {
+                ballMesh.position.set(ballPhysics.x, ballPhysics.y, ballPhysics.z);
+            }
+
+            // Update Camera follow position
+            camera.position.x = ballPhysics.x + Math.sin(cameraAngle) * Math.cos(cameraPitch) * cameraDist;
+            camera.position.y = ballPhysics.y + Math.sin(cameraPitch) * cameraDist + 1;
+            camera.position.z = ballPhysics.z + Math.cos(cameraAngle) * Math.cos(cameraPitch) * cameraDist;
+            camera.lookAt(ballPhysics.x, ballPhysics.y + 1, ballPhysics.z);
+        }
+
+        function respawnBall() {
+            gameDeaths++;
+            ballPhysics.x = currentCheckpoint.x;
+            ballPhysics.y = currentCheckpoint.y;
+            ballPhysics.z = currentCheckpoint.z;
+            ballPhysics.vx = 0; ballPhysics.vy = 0; ballPhysics.vz = 0;
+            updateHUD();
+        }
+
+        function spawnJumpParticles() {
+            // Particle visual burst
+        }
+
+        function updateHUD() {
+            let mins = Math.floor(gameTime / 60);
+            let secs = Math.floor(gameTime % 60);
+            let ms = Math.floor((gameTime % 1) * 100);
+            document.getElementById('hud-time.innerText') || (document.getElementById('hud-time').innerText = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}.${ms.toString().padStart(2,'0')}`);
+            document.getElementById('hud-deaths').innerText = gameDeaths;
+            document.getElementById('hud-style').innerText = gameStyle;
+        }
+
+        function triggerWin() {
+            gameTimerRunning = false;
+            showCustomModal("LEVEL COMPLETED!", `Time: ${document.getElementById('hud-time').innerText}\nDeaths: ${gameDeaths}\nStyle Points: ${gameStyle}`, false, () => {
+                switchScreen('play');
+            });
+        }
+
+        function clearSceneObjects() {
+            if (ballMesh) { scene.remove(ballMesh); ballMesh = null; }
+            gameplayMeshes.forEach(m => scene.remove(m));
+            gameplayMeshes = [];
+            editorMeshes.forEach(m => scene.remove(m));
+            editorMeshes = [];
+        }
+
+        // Pause Menu handling
+        window.togglePauseMenu = function() {
+            const modal = document.getElementById('modal-pause');
+            modal.classList.toggle('hidden');
+            gameTimerRunning = modal.classList.contains('hidden');
+        }
+        window.resumeGame = function() {
+            document.getElementById('modal-pause').classList.add('hidden');
+            gameTimerRunning = true;
+        }
+        window.quitToLevelSelect = function() {
+            document.getElementById('modal-pause').classList.add('hidden');
+            switchScreen('play');
+        }
+
+        // Custom Modal helper
+        function showCustomModal(title, msg, hasInput, callback) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-message').innerText = msg;
+            const inputContainer = document.getElementById('modal-input-container');
+            const inputField = document.getElementById('modal-input');
+            if (hasInput) {
+                inputContainer.classList.remove('hidden');
+                inputField.value = '';
+            } else {
+                inputContainer.classList.add('hidden');
+            }
+            const modal = document.getElementById('custom-modal');
+            modal.classList.remove('hidden');
+            const confirmBtn = document.getElementById('modal-btn-confirm');
+            const newBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
+            newBtn.addEventListener('click', () => {
+                modal.classList.add('hidden');
+                if (callback) callback(inputField.value);
+            });
+        }
+        window.closeCustomModal = function() {
+            document.getElementById('custom-modal').classList.add('hidden');
+        }
+
+        // Load Levels in Play Menu
+        window.switchPlayTab = function(tab) {
+            window.activePlayTab = tab;
+            ['official', 'community', 'my'].forEach(t => {
+                const btn = document.getElementById('tab-btn-' + t);
+                if (btn) {
+                    if (t === tab) {
+                        btn.className = "px-6 py-2 rounded-xl font-orbitron font-bold text-sm bg-cyan-500 text-slate-950 shadow-lg";
+                    } else {
+                        btn.className = "px-6 py-2 rounded-xl font-orbitron font-bold text-sm glass-panel text-slate-300 hover:bg-slate-800";
+                    }
+                }
+            });
+            loadPlayLevels();
+        }
+
+        async function loadPlayLevels() {
+            const container = document.getElementById('level-list-container');
+            container.innerHTML = '<div class="text-slate-400 font-orbitron">Loading levels...</div>';
+            try {
+                const q = query(collection(db, 'artifacts', appId, 'public', 'data'));
+                const querySnapshot = await getDocs(q);
+                let levels = [];
+                querySnapshot.forEach((docSnap) => {
+                    if (docSnap.id.startsWith('levels_')) {
+                        levels.push(docSnap.data());
+                    }
+                });
+
+                // Add starter level if official empty
+                if (levels.length === 0) {
+                    levels.push({
+                        id: 'starter_1',
+                        title: 'Cyber Horizon (Official)',
+                        authorName: 'LtpMer',
+                        official: true,
+                        difficulty: 'Easy',
+                        objects: getOfficialStarterLevel().objects
+                    });
+                }
+
+                container.innerHTML = '';
+                levels.forEach(lvl => {
+                    if (window.activePlayTab === 'official' && !lvl.official) return;
+                    if (window.activePlayTab === 'community' && lvl.official) return;
+                    if (window.activePlayTab === 'my' && (!currentUser || lvl.author !== currentUser.uid)) return;
+
+                    let card = document.createElement('div');
+                    card.className = "glass-panel p-6 rounded-2xl flex flex-col justify-between space-y-4 hover:border-cyan-400 transition";
+                    card.innerHTML = `
+                        <div>
+                            <div class="flex justify-between items-start">
+                                <h3 class="font-orbitron font-bold text-lg text-cyan-300">${lvl.title}</h3>
+                                <span class="text-[10px] font-orbitron px-2.5 py-1 rounded-full ${lvl.official ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500' : 'bg-purple-500/20 text-purple-400 border border-purple-500'}">${lvl.official ? 'Official' : 'Community'}</span>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-1">Creator: ${lvl.authorName || 'Unknown'}</p>
+                            <p class="text-xs text-amber-400 mt-1">Difficulty: ${lvl.difficulty || 'Medium'}</p>
+                        </div>
+                        <div class="flex space-x-3">
+                            <button onclick="playLevel('${lvl.id}')" class="flex-1 py-2.5 rounded-xl font-orbitron font-bold text-sm bg-cyan-500 text-slate-950 hover:bg-cyan-400 transition">PLAY</button>
+                            ${isAdmin && !lvl.official ? `<button onclick="makeOfficial('${lvl.id}')" class="px-4 py-2.5 rounded-xl font-orbitron font-bold text-xs bg-amber-500 text-slate-950 hover:bg-amber-400 transition">Set Official</button>` : ''}
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            } catch (err) {
+                console.error("Error loading levels:", err);
+                container.innerHTML = '<div class="text-rose-400 font-orbitron">Failed to load levels.</div>';
+            }
+        }
+
+        window.playLevel = async function(levelId) {
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'levels_' + levelId);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    currentLevel = docSnap.data();
+                    switchScreen('gameplay');
+                } else if (levelId === 'starter_1') {
+                    currentLevel = getOfficialStarterLevel();
+                    switchScreen('gameplay');
+                }
+            } catch (err) {
+                console.error("Error opening level:", err);
+            }
+        }
+
+        window.makeOfficial = async function(levelId) {
+            if (!isAdmin) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'levels_' + levelId);
+                await updateDoc(docRef, { official: true });
+                showCustomModal("Success", "Level promoted to Official!", false);
+                loadPlayLevels();
+            } catch (err) {
+                console.error("Error setting official:", err);
+            }
+        }
+
+        // Ball Customizer Preview
+        function initCustomizerPreview() {
+            const container = document.getElementById('preview-container');
+            const pScene = new THREE.Scene();
+            const pCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+            pCamera.position.z = 4;
+            const pRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            pRenderer.setSize(256, 256);
+            container.appendChild(pRenderer.domElement);
+
+            const pLight = new THREE.DirectionalLight(0xffffff, 1);
+            pLight.position.set(5, 5, 5);
+            pScene.add(pLight);
+            pScene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+            const geom = new THREE.SphereGeometry(1.2, 32, 32);
+            const mat = new THREE.MeshStandardMaterial({ color: customBall.color, roughness: 0.2 });
+            window.previewBallMesh = new THREE.Mesh(geom, mat);
+            pScene.add(window.previewBallMesh);
+
+            function pAnim() {
+                requestAnimationFrame(pAnim);
+                pRenderer.render(pScene, pCamera);
+            }
+            pAnim();
+
+            document.getElementById('custom-color').addEventListener('input', (e) => {
+                customBall.color = e.target.value;
+                mat.color.set(customBall.color);
+            });
+        }
+
+        window.saveCustomization = function() {
+            showCustomModal("Saved", "Ball customization settings saved successfully!", false);
+            switchScreen('main-menu');
+        }
+
+        window.searchProfiles = async function() {
+            const queryText = document.getElementById('profile-search-input').value.trim().toLowerCase();
+            const resultsContainer = document.getElementById('profile-results');
+            resultsContainer.innerHTML = '<div class="text-slate-400 font-orbitron">Searching profiles...</div>';
+            // Profile search query mockup
+            resultsContainer.innerHTML = `
+                <div class="glass-panel p-6 rounded-2xl flex flex-col space-y-3">
+                    <h3 class="font-orbitron font-bold text-lg text-amber-300">User: ${queryText || 'LtpMer'}</h3>
+                    <p class="text-xs text-slate-400">Passed Levels: 12 / 12 Official</p>
+                    <p class="text-xs text-slate-400">Created Levels: 4 Community Levels</p>
+                </div>
+            `;
+        }
+
+        window.saveSettings = function() {
+            customSettings.graphics = document.getElementById('settings-graphics').value;
+            showCustomModal("Settings Saved", "Your game settings have been applied.", false);
+            switchScreen('main-menu');
+        }
+
+        window.onload = function() {
+            initAuth();
+            initThree();
+        };
+    </script>
+</body>
+</html>
